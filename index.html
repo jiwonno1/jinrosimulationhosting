@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Chair - 학교 나무의자 및 다리 3D 시뮬레이터</title>
+    <!-- Three.js 및 OrbitControls CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --primary: #2563eb;
+            --success: #059669;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --text-main: #1e293b;
+            --text-sub: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 18px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 1.4rem;
+            color: var(--primary);
+        }
+
+        .badge-live {
+            background: #d1fae5;
+            color: var(--success);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 20px;
+        }
+
+        @media(max-width: 1000px) {
+            .main-grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 380px;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-danger { background: var(--danger); }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            font-size: 0.95rem;
+        }
+
+        .log-box {
+            background: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px;
+            height: 140px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: #38bdf8;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🪑 학교 나무의자 & 하체 관측 3D 시뮬레이터</h1>
+        <div class="badge-live">● 학교 의자 모델링 활성화</div>
+    </header>
+
+    <div class="main-grid">
+
+        <!-- [좌측] 3D 시각화 뷰어 영역 -->
+        <div class="card">
+            <div class="card-title">
+                <span>학교 나무의자 및 다리 3D 실시간 관측</span>
+                <span id="statusBadge" style="font-size:0.8rem; padding:6px 12px; border-radius:6px; background:#d1fae5; color:var(--success); font-weight:bold;">상태: 바른 자세</span>
+            </div>
+
+            <!-- 3D 캔버스 -->
+            <div id="canvas-container"></div>
+            <p style="font-size: 0.75rem; color: var(--text-sub); text-align: center; margin-bottom: 12px;">💡 마우스 드래그로 회전, 휠로 확대/축소가 가능합니다.</p>
+
+            <div>
+                <p style="font-size: 0.85rem; color: var(--text-sub); margin-bottom: 10px;">자세 테스트 시나리오 선택:</p>
+                <div class="scenario-grid">
+                    <button class="btn btn-success" onclick="setTargetPosture('good')">✅ 바른 자세</button>
+                    <button class="btn btn-warning" onclick="setTargetPosture('turtle')">⚠️ 거북목 발생</button>
+                    <button class="btn btn-danger" onclick="setTargetPosture('slouch')">🚨 구부정한 허리</button>
+                    <button class="btn btn-danger" onclick="setTargetPosture('cross')">🚨 다리 꼬기</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- [우측] 센서 데이터 및 AI 피드백 -->
+        <div class="card">
+            <div>
+                <div class="card-title">📊 실시간 센서 압력 및 분석</div>
+                
+                <div class="metric-row">
+                    <span>등받이 상단 (목/어깨 센서)</span>
+                    <strong id="valUpper" style="color:var(--success);">1.2 kgf (정상)</strong>
+                </div>
+                <div class="metric-row">
+                    <span>등받이 하단 (허리 센서)</span>
+                    <strong id="valLower" style="color:var(--success);">8.5 kgf (밀착)</strong>
+                </div>
+                <div class="metric-row">
+                    <span>좌석 시트 (좌/우 편차)</span>
+                    <strong id="valSeat" style="color:var(--success);">균형 (0.3 kgf)</strong>
+                </div>
+                <div class="metric-row">
+                    <span>AI 머신러닝 예측 정확도</span>
+                    <strong id="valAcc" style="color:var(--primary);">96.4%</strong>
+                </div>
+            </div>
+
+            <div>
+                <div class="card-title" style="margin-top: 20px;">
+                    <span>⚡ 시스템 진동 & 푸시 알림 로그</span>
+                    <button class="btn" style="width: auto; padding: 4px 10px; font-size: 0.75rem;" onclick="clearLogs()">초기화</button>
+                </div>
+                <div id="logTerminal" class="log-box">
+                    [10:42:00] 학교 나무의자 및 하체 3D 모델 로드 완료.<br>
+                    [10:42:01] IoT 센서 스트리밍 세션 연결됨.<br>
+                </div>
+            </div>
+
+            <button class="btn" style="background: var(--primary); margin-top: 14px;" onclick="triggerAlert()">✨ 앱 맞춤 스트레칭 안내 전송</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 1. Three.js 및 자유 시점 컨트롤러 세팅 ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf8fafc);
+
+        const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 2.5, 6.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.05;
+
+        // 조명 설정
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        mainLight.position.set(6, 12, 8);
+        mainLight.castShadow = true;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.3);
+        fillLight.position.set(-6, 5, -5);
+        scene.add(fillLight);
+
+        // --- 2. 현실적인 학교 나무의자 모델링 ---
+        const chairGroup = new THREE.Group();
+
+        // 나무 재질 (따뜻한 우드톤) 및 철제 프레임 재질
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0xc29b61, roughness: 0.6 });
+        const frameMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.5, roughness: 0.3 });
+
+        // 의자 좌석 (나무 판)
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 1.2), woodMat);
+        seat.position.set(0, -0.4, 0);
+        seat.castShadow = true; seat.receiveShadow = true;
+        chairGroup.add(seat);
+
+        // 의자 등받이 (나무 판)
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.1, 0.08), woodMat);
+        back.position.set(0, 0.35, -0.55);
+        back.castShadow = true; back.receiveShadow = true;
+        chairGroup.add(back);
+
+        // 의자 다리 4개 (철제 파이프 느낌)
+        const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.1);
+        for(let x of [-0.5, 0.5]) {
+            for(let z of [-0.5, 0.5]) {
+                const chairLeg = new THREE.Mesh(legGeo, frameMat);
+                chairLeg.position.set(x, -0.95, z);
+                chairLeg.castShadow = true;
+                chairGroup.add(chairLeg);
+            }
+        }
+        scene.add(chairGroup);
+
+        // --- 3. 3D 사람 아바타 (상체 + 사람 다리 관측 포함) ---
+        const avatarGroup = new THREE.Group();
+
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xfed7aa, roughness: 0.5 });
+        const clothMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.4 }); // 교복 상의 느낌
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 }); // 교복 바지/스커트 느낌
+
+        // 머리
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 32, 32), skinMat);
+        head.position.set(0, 1.15, 0);
+        head.castShadow = true;
+        avatarGroup.add(head);
+
+        // 상체
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.4), clothMat);
+        torso.position.set(0, 0.22, -0.1);
+        torso.castShadow = true;
+        avatarGroup.add(torso);
+
+        // 엉덩이 및 허벅지 (앉아있는 부위)
+        const hips = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.25, 0.9), pantsMat);
+        hips.position.set(0, -0.3, 0.05);
+        hips.castShadow = true;
+        avatarGroup.add(hips);
+
+        // 사람 다리 (왼쪽 다리, 오른쪽 다리 분리 - 다리 꼬기 시각화용)
+        const thighGeo = new THREE.BoxGeometry(0.35, 0.25, 0.9);
+        const calfGeo = new THREE.BoxGeometry(0.32, 0.9, 0.32);
+
+        // 왼쪽 다리 그룹
+        const leftLegGroup = new THREE.Group();
+        leftLegGroup.position.set(-0.25, -0.45, 0.45);
+        const leftThigh = new THREE.Mesh(thighGeo, pantsMat);
+        leftThigh.position.set(0, 0, 0.4); leftThigh.castShadow = true;
+        leftLegGroup.add(leftThigh);
+        const leftCalf = new THREE.Mesh(calfGeo, pantsMat);
+        leftCalf.position.set(0, -0.55, 0.75); leftCalf.castShadow = true;
+        leftLegGroup.add(leftCalf);
+        avatarGroup.add(leftLegGroup);
+
+        // 오른쪽 다리 그룹 (다리 꼬기 시 움직일 대상)
+        const rightLegGroup = new THREE.Group();
+        rightLegGroup.position.set(0.25, -0.45, 0.45);
+        const rightThigh = new THREE.Mesh(thighGeo, pantsMat);
+        rightThigh.position.set(0, 0, 0.4); rightThigh.castShadow = true;
+        rightLegGroup.add(rightThigh);
+        const rightCalf = new THREE.Mesh(calfGeo, pantsMat);
+        rightCalf.position.set(0, -0.55, 0.75); rightCalf.castShadow = true;
+        rightLegGroup.add(rightCalf);
+        avatarGroup.add(rightLegGroup);
+
+        chairGroup.add(avatarGroup);
+
+        // --- 4. 부드러운 애니메이션 보간(Lerp) 타겟 변수 세팅 ---
+        let targetHeadPos = { x: 0, y: 1.15, z: 0 };
+        let targetHeadRot = { x: 0, y: 0, z: 0 };
+        let targetTorsoPos = { x: 0, y: 0.22, z: -0.1 };
+        let targetTorsoRot = { x: 0, y: 0, z: 0 };
+        let targetRightLegRotX = 0;
+        let targetRightLegRotZ = 0;
+
+        // 렌더링 루프
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // 상체 및 머리 부드러운 이동
+            head.position.x += (targetHeadPos.x - head.position.x) * 0.1;
+            head.position.y += (targetHeadPos.y - head.position.y) * 0.1;
+            head.position.z += (targetHeadPos.z - head.position.z) * 0.1;
+
+            head.rotation.x += (targetHeadRot.x - head.rotation.x) * 0.1;
+            head.rotation.y += (targetHeadRot.y - head.rotation.y) * 0.1;
+            head.rotation.z += (targetHeadRot.z - head.rotation.z) * 0.1;
+
+            torso.position.x += (targetTorsoPos.x - torso.position.x) * 0.1;
+            torso.position.y += (targetTorsoPos.y - torso.position.y) * 0.1;
+            torso.position.z += (targetTorsoPos.z - torso.position.z) * 0.1;
+
+            torso.rotation.x += (targetTorsoRot.x - torso.rotation.x) * 0.1;
+            torso.rotation.y += (targetTorsoRot.y - torso.rotation.y) * 0.1;
+            torso.rotation.z += (targetTorsoRot.z - torso.rotation.z) * 0.1;
+
+            // 사람 다리(오른쪽 다리 꼬기 동작) 부드러운 보간
+            rightLegGroup.rotation.x += (targetRightLegRotX - rightLegGroup.rotation.x) * 0.1;
+            rightLegGroup.rotation.z += (targetRightLegRotZ - rightLegGroup.rotation.z) * 0.1;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // --- 5. 시나리오별 동작 제어 ---
+        function addLog(msg, type = "info") {
+            const terminal = document.getElementById('logTerminal');
+            const timeStr = new Date().toTimeString().split(' ')[0];
+            let color = "#38bdf8";
+            if(type === 'warning') color = "#fbbf24";
+            if(type === 'danger') color = "#f87171";
+            if(type === 'success') color = "#34d399";
+            
+            terminal.innerHTML += `<span style="color:${color}">[${timeStr}] ${msg}</span><br>`;
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('logTerminal').innerHTML = "";
+            addLog("로그가 초기화되었습니다.");
+        }
+
+        function setTargetPosture(type) {
+            const badge = document.getElementById('statusBadge');
+            const valUpper = document.getElementById('valUpper');
+            const valLower = document.getElementById('valLower');
+            const valSeat = document.getElementById('valSeat');
+
+            if(type === 'good') {
+                targetHeadPos = { x: 0, y: 1.15, z: 0 };
+                targetHeadRot = { x: 0, y: 0, z: 0 };
+                targetTorsoPos = { x: 0, y: 0.22, z: -0.1 };
+                targetTorsoRot = { x: 0, y: 0, z: 0 };
+                targetRightLegRotX = 0;
+                targetRightLegRotZ = 0;
+
+                badge.innerText = "상태: 바른 자세";
+                badge.style.background = "#d1fae5"; badge.style.color = "var(--success)";
+                valUpper.innerText = "1.2 kgf (정상)"; valUpper.style.color = "var(--success)";
+                valLower.innerText = "8.5 kgf (밀착)"; valLower.style.color = "var(--success)";
+                valSeat.innerText = "균형 (0.3 kgf 편차)"; valSeat.style.color = "var(--success)";
+
+                addLog("학교 나무의자: 학생이 바른 자세로 착석 중. 하체 및 상체 균형 완벽.", "success");
+            }
+            else if(type === 'turtle') {
+                targetHeadPos = { x: 0, y: 0.92, z: 0.38 };
+                targetHeadRot = { x: 0.35, y: 0, z: 0 };
+                targetTorsoPos = { x: 0, y: 0.22, z: -0.1 };
+                targetTorsoRot = { x: 0, y: 0, z: 0 };
+                targetRightLegRotX = 0;
+                targetRightLegRotZ = 0;
+
+                badge.innerText = "경고: 거북목 발생";
+                badge.style.background = "#fef3c7"; badge.style.color = "var(--warning)";
+                valUpper.innerText = "0.1 kgf (등받이 이탈)"; valUpper.style.color = "var(--warning)";
+                valLower.innerText = "4.2 kgf (하중 감소)"; valLower.style.color = "var(--warning)";
+                valSeat.innerText = "균형 유지"; valSeat.style.color = "var(--success)";
+
+                addLog("⚠️ 거북목 감지! 목과 머리가 앞으로 숙여집니다.", "warning");
+            }
+            else if(type === 'slouch') {
+                targetHeadPos = { x: 0, y: 0.82, z: 0.28 };
+                targetHeadRot = { x: 0.2, y: 0, z: 0 };
+                targetTorsoPos = { x: 0, y: 0.08, z: 0.12 };
+                targetTorsoRot = { x: -0.38, y: 0, z: 0 };
+                targetRightLegRotX = 0;
+                targetRightLegRotZ = 0;
+
+                badge.innerText = "위험: 구부정한 허리";
+                badge.style.background = "#fee2e2"; badge.style.color = "var(--danger)";
+                valUpper.innerText = "3.5 kgf (압박 과다)"; valUpper.style.color = "var(--danger)";
+                valLower.innerText = "12.0 kgf (요추 과부하)"; valLower.style.color = "var(--danger)";
+                valSeat.innerText = "앞쪽 쏠림 현상"; valSeat.style.color = "var(--danger)";
+
+                addLog("🚨 허리 과부하 감지! 나무의자 등받이에 허리가 밀착되지 않습니다.", "danger");
+            }
+            else if(type === 'cross') {
+                targetHeadPos = { x: 0.12, y: 1.15, z: 0 };
+                targetHeadRot = { x: 0, y: 0, z: -0.1 };
+                targetTorsoPos = { x: 0.06, y: 0.22, z: -0.1 };
+                targetTorsoRot = { x: 0, y: 0, z: -0.16 };
+                targetRightLegRotX = -1.2; // 다리를 위로 꼬는 관절 각도
+                targetRightLegRotZ = 0.4;
+
+                badge.innerText = "위험: 다리 꼬기 (골반 불균형)";
+                badge.style.background = "#fee2e2"; badge.style.color = "var(--danger)";
+                valUpper.innerText = "1.5 kgf"; valUpper.style.color = "var(--success)";
+                valLower.innerText = "7.0 kgf"; valLower.style.color = "var(--success)";
+                valSeat.innerText = "좌우 편차 23.1 kgf (위험)"; valSeat.style.color = "var(--danger)";
+
+                addLog("🚨 다리 꼬기 감지! 3D 아바타의 오른쪽 다리가 올라가며 좌석 압력이 한쪽으로 쏠립니다.", "danger");
+            }
+        }
+
+        function triggerAlert() {
+            addLog("🤖 AI 솔루션: 스트레칭 가이드를 앱으로 전송했습니다.", "success");
+            alert("✨ [스마트 체어 앱 알림]\n장시간 착석 피로도가 높습니다. 자리에서 일어나 목과 허리를 펴주세요!");
+        }
+    </script>
+</body>
+</html>
